@@ -61,6 +61,32 @@ def compute_thd(signal, fs, fundamental_freq, nharm=5):
     thd = 10*np.log10(harm_power / fund_power) if harm_power>0 else -np.inf
     return thd
 
+def compute_sinad(signal, fs, fundamental_freq, nharm = 5):
+    N = len(signal)
+    window = np.hanning(N)
+    xw = window * signal
+    X = np.abs(np.fft.rfft(xw)) ** 2
+    freqs = np.fft.rfftfreq(N, 1.0/fs)
+    fund_idx = np.argmin(np.abs(freqs - fundamental_freq))
+    sig_bins = np.arange(max(0, fund_idx-1), min(len(X), fund_idx+2))
+    signal_power = X[sig_bins].sum()
+    total_power = X.sum()
+    noise_power = total_power - signal_power
+    distortion_power = 0.0
+    for n in range(2, nharm + 1):
+        idx = np.argmin(np.abs(freqs - fundamental_freq*n))
+        if idx < len(X):
+            distortion_power += X[idx]
+    return 10 * np.log10(signal_power / (noise_power + distortion_power))
+
+def compute_enob(sinad_db):
+    how_much_one_bit = 6.02
+    quant_noise_floor = 1.76
+    # ENOB = (SINAD - 1.76) / 6.02
+    if sinad_db == -np.inf:
+        return 0.0
+    return (sinad_db - quant_noise_floor) / how_much_one_bit
+
 # testy automatyczne 
 results = []
 fs = 200e3
@@ -77,12 +103,17 @@ for bits in bit_depths:
             qsig = quantize(sig, bits)
             snr = compute_snr(qsig, fs, f0)
             thd = compute_thd(qsig, fs, f0, nharm=5)
+            sinad = compute_sinad(qsig, fs, f0, nharm=5)
+            enob = compute_enob(sinad)
+            print(f"Bits: {bits}, Noise std: {noise}, Amp: {amp} => SNR: {snr:.2f} dB, THD: {thd:.2f} dB, SINAD: {sinad:.2f} dB, ENOB: {enob:.2f} bits")
             results.append({
                 "bits": bits,
                 "noise_std": noise,
                 "amp": amp,
                 "snr_db": round(float(snr),3) if np.isfinite(snr) else None,
-                "thd_db": round(float(thd),3) if np.isfinite(thd) else None
+                "thd_db": round(float(thd),3) if np.isfinite(thd) else None,
+                "sinad_db": round(float(sinad),3) if np.isfinite(sinad) else None,
+                "enob": round(float(enob),3) if np.isfinite(enob) else None
             })
 
 df = pd.DataFrame(results)
@@ -100,6 +131,49 @@ plt.ylabel("SNR (dB)")
 plt.title("SNR vs input noise for different ADC bit depths")
 plt.legend()
 plot_path = "snr_vs_noise.png"
+plt.tight_layout()
+plt.savefig(plot_path)
+plt.close()
+
+# THD - noise bit depth
+plt.figure(figsize=(6,4))
+for bits in sorted(df['bits'].unique()):
+    sub = df[df['bits']==bits].groupby('noise_std')['thd_db'].mean().reset_index()
+    plt.plot(sub['noise_std'], sub['thd_db'], marker='o', label=f"{bits} bits")
+plt.xscale('log')
+plt.xlabel("Noise std (log scale)")
+plt.ylabel("THD (dB)")
+plt.title("THD vs input noise for different ADC bit depths")
+plt.legend()
+plot_path = "thd_vs_noise.png"
+plt.tight_layout()
+plt.savefig(plot_path)
+plt.close()
+# SINAD - noise bit depth
+plt.figure(figsize=(6,4))
+for bits in sorted(df['bits'].unique()):
+    sub = df[df['bits']==bits].groupby('noise_std')['sinad_db'].mean().reset_index()
+    plt.plot(sub['noise_std'], sub['sinad_db'], marker='o', label=f"{bits} bits")
+plt.xscale('log')
+plt.xlabel("Noise std (log scale)")
+plt.ylabel("SINAD (dB)")
+plt.title("SINAD vs input noise for different ADC bit depths")
+plt.legend()
+plot_path = "sinad_vs_noise.png"
+plt.tight_layout()
+plt.savefig(plot_path)
+plt.close()
+# ENOB - noise bit depth
+plt.figure(figsize=(6,4))
+for bits in sorted(df['bits'].unique()):
+    sub = df[df['bits']==bits].groupby('noise_std')['enob'].mean().reset_index()
+    plt.plot(sub['noise_std'], sub['enob'], marker='o', label=f"{bits} bits")
+plt.xscale('log')
+plt.xlabel("Noise std (log scale)")
+plt.ylabel("ENOB (bits)")
+plt.title("ENOB vs input noise for different ADC bit depths")
+plt.legend()
+plot_path = "enob_vs_noise.png"
 plt.tight_layout()
 plt.savefig(plot_path)
 plt.close()
