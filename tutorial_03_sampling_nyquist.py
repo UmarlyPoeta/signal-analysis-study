@@ -73,10 +73,11 @@ fig1.suptitle('Wpływ Częstotliwości Próbkowania na Reprezentację Sygnału',
 
 sampling_rates = [50, 20, 10, 8]  # Hz
 colors = ['green', 'blue', 'orange', 'red']
+color_codes = ['g', 'b', 'C1', 'r']  # matplotlib color codes
 labels = ['Nadpróbkowanie (fs=50Hz)', 'Dobre próbkowanie (fs=20Hz)', 
           'Próbkowanie krytyczne (fs=10Hz)', 'Podpróbkowanie (fs=8Hz)']
 
-for i, (fs_sample, color, label) in enumerate(zip(sampling_rates, colors, labels)):
+for i, (fs_sample, color, color_code, label) in enumerate(zip(sampling_rates, colors, color_codes, labels)):
     # Próbkowanie
     n_samples = int(fs_sample * duration)
     t_sampled = np.linspace(0, duration, n_samples, endpoint=False)
@@ -84,9 +85,9 @@ for i, (fs_sample, color, label) in enumerate(zip(sampling_rates, colors, labels
     
     # Wykres
     axes1[i].plot(t_continuous, signal_continuous, 'k-', linewidth=1, alpha=0.3, label='Sygnał oryginalny')
-    axes1[i].stem(t_sampled, signal_sampled, linefmt=color, markerfmt=f'{color[0]}o', 
+    axes1[i].stem(t_sampled, signal_sampled, linefmt=color_code+'-', markerfmt=color_code+'o', 
                   basefmt=' ', label='Próbki')
-    axes1[i].plot(t_sampled, signal_sampled, f'{color[0]}--', linewidth=1, alpha=0.5)
+    axes1[i].plot(t_sampled, signal_sampled, color=color_code, linestyle='--', linewidth=1, alpha=0.5)
     axes1[i].set_ylabel('Amplituda')
     axes1[i].grid(True, alpha=0.3)
     axes1[i].legend(loc='upper right')
@@ -181,10 +182,14 @@ axes2[1, 1].set_xlim(0, fs_bad/2 + 5)
 # Porównanie - oba przypadki razem
 axes2[2, 0].plot(t_continuous[:500], signal_high[:500], 'k-', linewidth=2, alpha=0.5,
                  label=f'Sygnał oryginalny ({f_high} Hz)')
-axes2[2, 0].stem(t_good[:30], signal_good[:30], linefmt='g-', markerfmt='go', basefmt=' ',
-                 label=f'Dobre próbkowanie (fs={fs_good} Hz)', alpha=0.6)
-axes2[2, 0].stem(t_bad[:15], signal_bad[:15], linefmt='r-', markerfmt='ro', basefmt=' ',
-                 label=f'Podpróbkowanie (fs={fs_bad} Hz)', alpha=0.6)
+markerline, stemlines, baseline = axes2[2, 0].stem(t_good[:30], signal_good[:30], linefmt='g-', markerfmt='go', basefmt=' ',
+                 label=f'Dobre próbkowanie (fs={fs_good} Hz)')
+stemlines.set_alpha(0.6)
+markerline.set_alpha(0.6)
+markerline2, stemlines2, baseline2 = axes2[2, 0].stem(t_bad[:15], signal_bad[:15], linefmt='r-', markerfmt='ro', basefmt=' ',
+                 label=f'Podpróbkowanie (fs={fs_bad} Hz)')
+stemlines2.set_alpha(0.6)
+markerline2.set_alpha(0.6)
 axes2[2, 0].set_title('Porównanie: Prawidłowe vs Podpróbkowanie')
 axes2[2, 0].set_xlabel('Czas [s]')
 axes2[2, 0].set_ylabel('Amplituda')
